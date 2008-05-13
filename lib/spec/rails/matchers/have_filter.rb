@@ -4,53 +4,50 @@ module Spec
       class HaveFilter
         def initialize(filter_name)
           @filter_name = filter_name.to_sym
-          @filter_type = :before
+          @filter_type = :before?
           @actions = :any_action
         end
 
         def matches?(target)
-          @target = target.class
-          filter = @target.find_filter(@filter_name) { |filter| filter.type == @filter_type }
+          filter = target.class.filter_chain.select { |f| f.send(@filter_type) and f.method == @filter_name }.first
 
           if @actions == :any_action
             filter
           else
-            @actions = stringify(@actions)
-            filter and !@actions.find { |action| @target.filter_excluded_from_action?(filter, action) }
+            filter and Array(@actions).find do |action| 
+              if only = filter.options[:only]
+                Array(only).include?(action)
+              else
+                !Array(filter.options[:except]).include?(action)
+              end
+            end
           end
         end
 
         def failure_message
-          "#{@target} expected to have #{@filter_type}_filter #{@filter_name} but none found"
+          "#{@target} expected to have a #{@filter_type}_filter '#{@filter_name}' but none was found."
         end
 
         def negative_failure_message  
-          "#{@target} expected not to have #{@filter_type}_filter #{@filter_name}, but it was found"
+          "#{@target} expected to not have a #{@filter_type}_filter '#{@filter_name}' but it was found."
         end
 
         def before(actions)
-          @filter_type = :before
+          @filter_type = :before?
           @actions = actions
           self
         end
 
         def after(actions)
-          @filter_type = :after
+          @filter_type = :after?
           @actions = actions
           self
         end
 
         def around(actions)
-          @filter_type = :around
+          @filter_type = :around?
           @actions = actions
           self
-        end
-
-        private
-
-        def stringify(ary)
-          ary = [ary] unless ary.is_a?(Array)
-          ary.map(&:to_s)
         end
       end
 
